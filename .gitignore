@@ -1,0 +1,8 @@
+bin
+eclipse
+.classpath
+.project
+dist
+play-riak-test/cobertura.ser
+play-riak-test/test-result
+play-riak-test/tmp
