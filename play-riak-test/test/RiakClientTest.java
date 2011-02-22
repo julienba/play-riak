@@ -3,6 +3,7 @@ import java.util.List;
 
 import org.junit.Test;
 
+import play.Play;
 import play.modules.riak.RiakPlugin;
 import play.mvc.Http;
 import play.test.UnitTest;
@@ -21,7 +22,7 @@ public class RiakClientTest extends UnitTest{
 
 	@Test
 	public void builddObject(){
-		RiakClient riak = new RiakClient(RiakPlugin.RIAK_URL);
+		RiakClient riak = new RiakClient(Play.configuration.getProperty("riak.url"));
 		RiakObject o = null;
 		o = new RiakObject("test", "sonic_youth");
 		riak.store(o);
@@ -54,7 +55,7 @@ public class RiakClientTest extends UnitTest{
 	
 	@Test
 	public void find(){
-		RiakClient riak = new RiakClient(RiakPlugin.RIAK_URL);
+		RiakClient riak = new RiakClient(Play.configuration.getProperty("riak.url"));
 		BucketResponse r = riak.listBucket("test");
 		Collection<String> keys = r.getBucketInfo().getKeys();
 		assertNotNull(keys);
@@ -62,7 +63,7 @@ public class RiakClientTest extends UnitTest{
 	
 	@Test
 	public void links(){
-		RiakClient riak = new RiakClient(RiakPlugin.RIAK_URL);
+		RiakClient riak = new RiakClient(Play.configuration.getProperty("riak.url"));
 		RiakObject o = null;
 		
 		o = new RiakObject("test", "sonic_youth");
@@ -106,7 +107,7 @@ public class RiakClientTest extends UnitTest{
 	
 	@Test
 	public void crud(){
-		RiakClient riak = new RiakClient(RiakPlugin.RIAK_URL);
+		RiakClient riak = new RiakClient(Play.configuration.getProperty("riak.url"));
 		RiakObject o = null;
 		
 		// CREATE

@@ -1,22 +1,7 @@
 package models.riak;
 
-import java.lang.reflect.Type;
-import java.util.Iterator;
-import java.util.List;
-
-import org.json.JSONException;
-
-import com.basho.riak.client.mapreduce.JavascriptFunction;
-import com.basho.riak.client.response.MapReduceResponse;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import javassist.CtMethod;
-import play.Logger;
 import play.modules.riak.RiakEntity;
-import play.modules.riak.RiakMP;
 import play.modules.riak.RiakModel;
-import play.modules.riak.RiakPlugin;
 
 @RiakEntity(key="name")
 public class MusicBand extends RiakModel{
@@ -29,6 +14,33 @@ public class MusicBand extends RiakModel{
 		this.name = name;
 		this.description = description;
 	}
+	
+	public static MusicBand find12(String bucket, String key){
+		
+		try {
+			com.basho.riak.pbc.RiakObject[] ro = play.modules.riak.RiakPlugin.riak.fetch(bucket, key);
+			if(ro.length > 0){
+				com.basho.riak.pbc.RiakObject o = ro[0];
+				MusicBand e = (MusicBand)new com.google.gson.Gson().fromJson(o.getValue().toStringUtf8(), MusicBand.class);
+				e.setObj(o);
+				return e;
+			}			
+		} catch (java.io.IOException e1) {
+			e1.printStackTrace();
+		}
+		return null;		
+	}
+	
+	public static java.util.List findAll2(String bucket){
+		java.util.Collection keys = MusicBand.findKeys(bucket);
+		java.util.List result = new java.util.ArrayList();
+		for (java.util.Iterator iterator = keys.iterator(); iterator.hasNext();) {
+			String key = (String) iterator.next();
+			result.add(find(bucket,key));
+		}
+		return result;
+	}
+	
 	
 	@Override
 	public String toString() {

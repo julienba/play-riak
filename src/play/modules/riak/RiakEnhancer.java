@@ -1,12 +1,5 @@
 package play.modules.riak;
 
-import java.lang.reflect.Type;
-import java.util.List;
-
-import org.json.JSONException;
-
-import com.basho.riak.client.mapreduce.JavascriptFunction;
-
 import javassist.CtClass;
 import javassist.CtMethod;
 import play.Logger;
@@ -49,21 +42,29 @@ public class RiakEnhancer extends Enhancer {
 		// - Implement methods
 		Logger.debug( clazz.getName() + "-->enhancing RiakEntity-->" + ctClass.getName());
 
-		// /!\WARNING/!\ Generics won't works in javassist		
-		// find 		
+		// /!\WARNING/!\ Generics won't works in javassist, 
+		// hard to debug, 
+		// TIPS: write method with absolute object path in class implement RiakModel and copy paste, be patient
+		 				
 		CtMethod find = CtMethod.make("public static RiakModel find(String bucket, String key){" +
-				"com.basho.riak.client.response.FetchResponse r = RiakPlugin.riak.fetch(bucket, key);" +
-				"if(r.hasObject()){" +
-					"com.basho.riak.client.RiakObject o = r.getObject();" +
-					entityName + " e = (" + entityName + ")new com.google.gson.Gson().fromJson(o.getValue(), " + entityName + ".class);" +
-					"e.setObj(o);"+
+			"try {" +
+				"com.basho.riak.pbc.RiakObject[] ro = play.modules.riak.RiakPlugin.riak.fetch(bucket, key);" +
+				"if(ro.length > 0){" +
+					"com.basho.riak.pbc.RiakObject o = ro[0];"+
+					entityName +" e = (" + entityName + ")new com.google.gson.Gson().fromJson(o.getValue().toStringUtf8(), " +
+					entityName +".class);" +
+					"e.setObj(o);" +
 					"return e;" +
 				"}" +
-				"return null;}", ctClass);
+			"} catch(java.io.IOException e1){" +
+				"e1.printStackTrace();" +
+			"}"+
+			"return null;}", ctClass);
 		ctClass.addMethod(find);		
+			
 
 		CtMethod find2 = CtMethod.make("public static RiakModel find(Class clazz, String key){" +
-				"return find(RiakPlugin.getBucketName(clazz), key); }",ctClass);
+				"return find(play.modules.riak.RiakPlugin.getBucketName(clazz), key); }",ctClass);
 		ctClass.addMethod(find2);
 		
 		CtMethod findAll = CtMethod.make("public static java.util.List findAll(String bucket){" +
@@ -79,32 +80,32 @@ public class RiakEnhancer extends Enhancer {
 		
 		
 		CtMethod findAll2 = CtMethod.make("public static java.util.List findAll(Class clazz){" +
-				"return findAll(RiakPlugin.getBucketName(clazz));}",ctClass);
+				"return findAll(play.modules.riak.RiakPlugin.getBucketName(clazz));}",ctClass);
 		ctClass.addMethod(findAll2);
-		
-		
-		CtMethod fetch = CtMethod.make("public static java.util.List fetch(Class clazz, java.lang.reflect.Type returnType, int start, int end){"+
-		"try {"+
-			"int[] array = new int[2];"+
-			"if(start != -1 && end != -1){"+
-				"array[0] = start;"+
-				"array[1] = end;"+
-			"}"+
-			"com.basho.riak.client.response.MapReduceResponse r = play.modules.riak.RiakPlugin.riak.mapReduceOverBucket(RiakPlugin.getBucketName(clazz))"+
-				".map(com.basho.riak.client.mapreduce.JavascriptFunction.named(\"Riak.mapValuesJson\"), false)"+
-				".reduce(com.basho.riak.client.mapreduce.JavascriptFunction.named(\"Riak.reduceSlice\"),array,true).submit();"+
-		    "if (r.isSuccess()) {"+
-		    	"java.util.List jsonResult = new com.google.gson.Gson().fromJson(r.getBodyAsString(), returnType);"+
-		    	"return jsonResult;"+
-		    "}else{"+
-		    	"System.out.println(\"Error during fetch for class \");"+
-		    "}"+	
-		"} catch (org.json.JSONException e) {"+
-			"e.printStackTrace();"+
-		"}"+		
-		"return null;}"		
-		,ctClass);
-		ctClass.addMethod(fetch);
+
+		//TODO : depend of map reduce, see later
+//		CtMethod fetch = CtMethod.make("public static java.util.List fetch(Class clazz, java.lang.reflect.Type returnType, int start, int end){"+
+//		"try {"+
+//			"int[] array = new int[2];"+
+//			"if(start != -1 && end != -1){"+
+//				"array[0] = start;"+
+//				"array[1] = end;"+
+//			"}"+
+//			"com.basho.riak.client.response.MapReduceResponse r = play.modules.riak.RiakPlugin.riak.mapReduceOverBucket(RiakPlugin.getBucketName(clazz))"+
+//				".map(com.basho.riak.client.mapreduce.JavascriptFunction.named(\"Riak.mapValuesJson\"), false)"+
+//				".reduce(com.basho.riak.client.mapreduce.JavascriptFunction.named(\"Riak.reduceSlice\"),array,true).submit();"+
+//		    "if (r.isSuccess()) {"+
+//		    	"java.util.List jsonResult = new com.google.gson.Gson().fromJson(r.getBodyAsString(), returnType);"+
+//		    	"return jsonResult;"+
+//		    "}else{"+
+//		    	"System.out.println(\"Error during fetch for class \");"+
+//		    "}"+	
+//		"} catch (org.json.JSONException e) {"+
+//			"e.printStackTrace();"+
+//		"}"+		
+//		"return null;}"		
+//		,ctClass);
+//		ctClass.addMethod(fetch);
 		
 		// Done.
 		applicationClass.enhancedByteCode = ctClass.toBytecode(); 

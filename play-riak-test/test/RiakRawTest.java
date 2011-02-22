@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.junit.Test;
 
+import play.Play;
 import play.libs.WS;
 import play.libs.WS.HttpResponse;
 import play.libs.WS.WSRequest;
@@ -21,13 +22,13 @@ import com.google.gson.reflect.TypeToken;
  */
 public class RiakRawTest extends UnitTest{
 
-	public static String BASE_URL = "http://127.0.0.1:8091/";
+	public static String BASE_URL = Play.configuration.getProperty("riak.url");
 		
 	// curl -H "Accept: text/plain" http://127.0.0.1:8091/stats
 	@Test
 	public void stat(){
 		
-		HttpResponse response = WS.url(RiakPlugin.RIAK_URL + "/" + RiakPlugin.RIAK_URL_STATS).get();
+		HttpResponse response = WS.url(Play.configuration.getProperty("riak.url") + "/" + RiakPlugin.RIAK_URL_STATS).get();
 		
 		int status = response.getStatus();
 		assertEquals(200, status);	
@@ -64,7 +65,7 @@ public class RiakRawTest extends UnitTest{
 	
 	@Test
 	public void listKey(){
-		WSRequest wsRequest = WS.url(BASE_URL + "riak/test?keys=true");
+		WSRequest wsRequest = WS.url(BASE_URL + "/test?keys=true");
 		Map<String, Object> params = new HashMap<String,Object>();
 		params.put("keys", true);
 		params.put("props", "true");

@@ -1,0 +1,4 @@
+h1. Riak plugin for Play framework
+
+See http://www.playframework.org/modules/riak
+or upstream file in documentation/home.textile

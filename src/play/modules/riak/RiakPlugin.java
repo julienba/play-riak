@@ -1,4 +1,5 @@
 package play.modules.riak;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -7,11 +8,8 @@ import play.Logger;
 import play.Play;
 import play.PlayPlugin;
 import play.classloading.ApplicationClasses.ApplicationClass;
-import play.libs.WS;
-import play.libs.WS.HttpResponse;
 
-import com.basho.riak.client.RiakClient;
-import com.basho.riak.client.RiakConfig;
+import com.basho.riak.pbc.RiakClient;
 
 public class RiakPlugin extends PlayPlugin{
 	
@@ -19,6 +17,7 @@ public class RiakPlugin extends PlayPlugin{
 	 * riak url like http://localhost:8091/riak
 	 */
 	public static String RIAK_URL 	= "";
+	public static int	 RIAK_PORT 	= 0;
 	/**
 	 * riak url without /riak
 	 */
@@ -31,15 +30,10 @@ public class RiakPlugin extends PlayPlugin{
 	/**
 	 * main client
 	 */
-	public static RiakClient riak = null; 
+	public static RiakClient riak = null;
 	
 	public static String DEFAULT_MODEL_PREFIX = "models.riak.";
 	public static String MODEL_PREFIX;
-	/**
-	 * Default property
-	 */
-	public static String RIAK_TIMEOUT = "2000";
-	public static String RIAK_MAX_CONNECTION = "50";
 	
 	private RiakEnhancer enhancer = new RiakEnhancer();
 
@@ -62,36 +56,23 @@ public class RiakPlugin extends PlayPlugin{
 	
 	public boolean init(){
 		
-		RIAK_URL = Play.configuration.getProperty("riak.url");
-		RIAK_BASE = RIAK_URL.substring(0, RIAK_URL.lastIndexOf("/") + 1);
-		RIAK_URL = Play.configuration.getProperty("riak.url");
-		
-		if(RIAK_URL.isEmpty()){
-			Logger.error("riak.url is empty");
-		}
-		
-		MODEL_PREFIX = Play.configuration.getProperty("riak.model.prefix", DEFAULT_MODEL_PREFIX);
-		
-		Logger.info("Init riak client (url: %s )", RIAK_URL);
-		
-		RiakConfig config = new RiakConfig(RIAK_URL);
-		
-		int timeout = Integer.parseInt(Play.configuration.getProperty("riak.timeout", RIAK_TIMEOUT));
-		int maxConnection = Integer.parseInt(Play.configuration.getProperty("riak.maxConnection", RIAK_MAX_CONNECTION));
-		
-		config.setTimeout(timeout);
-		config.setMaxConnections(maxConnection);
-		riak = new RiakClient(config);
-		
-		// make a first request for retrieve base information and check that URL is good
-		Logger.debug("Call stats url for check riak avaibility (url %s%s%s )",RIAK_URL,"/", RIAK_URL_STATS);
-		HttpResponse response = WS.url(RIAK_URL + "/" + RIAK_URL_STATS).get();
-		if(response.getStatus() == 200)	
-			return true;
-		else
+		RIAK_URL = Play.configuration.getProperty("riak.protobuf.url");
+		RIAK_PORT = Integer.valueOf(Play.configuration.getProperty("riak.protobuf.port"));
+		if(RIAK_URL.isEmpty() ||RIAK_PORT == 0){
+			Logger.error("riak.protobuf.url or riak.protobuf.port is empty");
 			return false;
+		}		
+		
+		try {
+			Logger.info("Init riak client (url: %s )", RIAK_URL);
+			riak = new RiakClient(RIAK_URL);
+			riak.ping();
+			return true;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return false;
+		}
 	}
-	
 	
 	@Override
     public void onApplicationStart() {
