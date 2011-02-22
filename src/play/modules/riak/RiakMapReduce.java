@@ -1,5 +1,6 @@
 package play.modules.riak;
 
+import java.io.File;
 import java.util.List;
 
 import org.json.JSONException;
@@ -10,37 +11,25 @@ import com.basho.riak.client.mapreduce.JavascriptFunction;
 import com.basho.riak.client.mapreduce.MapReduceFunction;
 import com.basho.riak.client.response.MapReduceResponse;
 
+import org.jcoffeescript.JCoffeeScriptCompiler;
+import org.apache.commons.io.FileUtils;
+
 public class RiakMapReduce {
+    private static String getCoffeeFile(String filename) {
+        try {
+            File file = new File(filename + ".coffee");
+            String content = FileUtils.readFileToString(file);
+            return new org.jcoffeescript.JCoffeeScriptCompiler().compile(content);
+        }
+        catch (Exception e) {
+            return "";
+        }
+    }
 
 	// Contributed By: Francisco Treacy
 	// http://contrib.basho.com/sorting-by-field.html
-	public static String orderByReduceString = "function ( v , args ) {"+
-		"var field = args[0];"+
-		"var reverse = args[1];"+
-		"v.sort(function(a, b) {"+
-	        "if (reverse) {"+
-	            "var _ref = [b, a];"+
-	            "a = _ref[0];"+
-	            "b = _ref[1];"+
-	        "}"+
-	        "if (((typeof a === \"undefined\" || a === null) ? undefined :"+
-	            "a[field]) < ((typeof b === \"undefined\" || b === null) ? undefined :"+
-	            "b[field])) {"+
-	                "return -1;"+
-	        "} else if (((typeof a === \"undefined\" || a === null) ? undefined :"+
-	            "a[field]) === ((typeof b === \"undefined\" || b === null) ? undefined :"+
-	            "b[field])) {"+
-	                "return 0;"+
-	            "} else if (((typeof a === \"undefined\" || a === null) ? undefined :"+
-	                "a[field]) > ((typeof b === \"undefined\" || b === null) ? undefined :"+
-	                "b[field])) {"+
-	            "return 1;"+
-	        "}"+
-	    "});"+            				
-		"return v"+
-	"}";	
-	
-	
+	public static String orderByReduceString = getCoffeeFile("orderByReduceString");
+    
 	// see http://siculars.posterous.com/using-riaks-mapreduce-for-sorting
 	public static String orderByCreationDateMapString = 
 		"function(v, keydata, args) {" +
