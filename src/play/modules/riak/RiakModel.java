@@ -17,12 +17,16 @@ import play.Play;
 import play.classloading.ApplicationClasses.ApplicationClass;
 
 import com.basho.riak.pbc.KeySource;
+import com.basho.riak.pbc.MapReduceResponseSource;
+import com.basho.riak.pbc.RequestMeta;
 import com.basho.riak.pbc.RiakLink;
 import com.basho.riak.pbc.RiakObject;
+import com.basho.riak.pbc.mapreduce.JavascriptFunction;
+import com.basho.riak.pbc.mapreduce.MapReduceBuilder;
+import com.basho.riak.pbc.mapreduce.MapReduceResponse;
 import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
 
-//http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
 public class RiakModel {
 	
 	// Raw object
@@ -118,29 +122,35 @@ public class RiakModel {
 	}
 	
 	public static List findOrderByDate(Class clazz, Type returnType, boolean reverse){
-//		try {
-//			MapReduceResponse r = null;
-//			
-//			if(reverse){
-//				r = RiakPlugin.riak.mapReduceOverBucket(RiakPlugin.getBucketName(clazz))
-//					.map(JavascriptFunction.anon(RiakMapReduce.orderByCreationDateMapString), false)
-//					.reduce(JavascriptFunction.anon(RiakMapReduce.orderByCreateDateDescReduceString), false)
-//					.reduce(JavascriptFunction.anon(RiakMapReduce.cleanReduce), true).submit();
-//			}else{
-//				r = RiakPlugin.riak.mapReduceOverBucket(RiakPlugin.getBucketName(clazz))
-//					.map(JavascriptFunction.anon(RiakMapReduce.orderByCreationDateMapString), false)
-//					.reduce(JavascriptFunction.anon(RiakMapReduce.orderByCreateDateAscReduceString), false)
-//					.reduce(JavascriptFunction.anon(RiakMapReduce.cleanReduce), true).submit();
-//			}
-//		    if (r.isSuccess()) {
-//		    	List jsonResult = new Gson().fromJson(r.getBodyAsString(), returnType);
-//		    	return jsonResult;
-//		    }else
-//		    	return null;
-//		} catch (JSONException e) {
-//			e.printStackTrace();
-//			return null;
-//		}		
+
+		MapReduceBuilder builder = new MapReduceBuilder(RiakPlugin.riak);
+		builder.setBucket(RiakPlugin.getBucketName(clazz));
+		builder.map(JavascriptFunction.anon(RiakMapReduce.function.get("orderByCreationDateMap")), false);
+		if(reverse)
+			builder.reduce(JavascriptFunction.anon(RiakMapReduce.function.get("orderByCreateDateDescReduce")), false);
+		else
+			builder.reduce(JavascriptFunction.anon(RiakMapReduce.function.get("orderByCreateDateAscReduce")), false);
+		
+		builder.reduce(JavascriptFunction.anon(RiakMapReduce.function.get("cleanReduce")), true);
+		try {
+			MapReduceResponseSource mrs = builder.submit(new RequestMeta().contentType("application/json"));
+			String res = "";
+			while(mrs.hasNext()){
+				MapReduceResponse mr = mrs.next();
+				ByteString bs = mr.getContent();
+				if(bs != null && !bs.isEmpty())
+					res += bs.toStringUtf8();
+			}
+			
+			if(!res.isEmpty()){
+				List jsonResult = new Gson().fromJson(res, returnType);
+				return jsonResult;
+			}
+		}catch (IOException e) {
+			Logger.error("Error during findOrderByDate");
+			e.printStackTrace();
+		}	
+	
 		return null;
 	}
 	public static List findOrderByDate(Class clazz, Type returnType){
@@ -148,9 +158,9 @@ public class RiakModel {
 	}
 	
 	//TODO: fix in enhancer
-//	public static <T extends RiakModel> List<T> fetch(Class clazz, Type returnType, int start, int end){
-//		throw new UnsupportedOperationException("Please annotate your model with @RiakEntity annotation.");
-//	}
+	public static <T extends RiakModel> List<T> fetch(Class clazz, Type returnType, int start, int end){
+		throw new UnsupportedOperationException("Please annotate your model with @RiakEntity annotation.");
+	}
 	
 	public static List<String> findKeys(Class clazz){
 		return findKeys(RiakPlugin.getBucketName(clazz)); 
@@ -303,6 +313,29 @@ public class RiakModel {
 	
 	public static <T extends RiakModel> List<T> jsonToList(String json, Type listType){
 		throw new UnsupportedOperationException("Please annotate your model with @RiakEntity annotation.");
+	}
+	
+	public static List orderBy(Class clazz, String field, Boolean reverse , Type listType){
+		Object[] args = {field, reverse};
+		MapReduceBuilder builder = new MapReduceBuilder();
+		builder.setBucket(RiakPlugin.getBucketName(clazz));
+		builder.setRiakClient(play.modules.riak.RiakPlugin.riak);
+		builder.map(JavascriptFunction.named("Riak.mapValuesJson"), false);
+		builder.reduce(JavascriptFunction.anon(RiakMapReduce.function.get("orderByReduce")), args, true);
+		try {
+			MapReduceResponseSource mrs = builder.submit(new RequestMeta().contentType("application/json"));
+			while(mrs.hasNext()){
+				MapReduceResponse mr = mrs.next();
+				ByteString bs = mr.getContent();
+				if(bs != null && !bs.isEmpty()){
+					return new com.google.gson.Gson().fromJson(bs.toStringUtf8(), listType);
+				}
+			}			
+		}catch (IOException e) {
+			e.printStackTrace();
+		}				
+		
+		return null;
 	}
 	
 //	public static List orderBy(Class clazz, String field, Boolean reverse , Type listType){

@@ -1,88 +1,110 @@
 package play.modules.riak;
 
 import java.io.File;
-import java.util.List;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
-import org.json.JSONException;
-
-import play.Logger;
-
-import com.basho.riak.client.mapreduce.JavascriptFunction;
-import com.basho.riak.client.mapreduce.MapReduceFunction;
-import com.basho.riak.client.response.MapReduceResponse;
-
-import org.jcoffeescript.JCoffeeScriptCompiler;
 import org.apache.commons.io.FileUtils;
 
+import com.basho.riak.pbc.MapReduceResponseSource;
+import com.basho.riak.pbc.RequestMeta;
+import com.basho.riak.pbc.mapreduce.JavascriptFunction;
+import com.basho.riak.pbc.mapreduce.MapReduceBuilder;
+import com.basho.riak.pbc.mapreduce.MapReduceResponse;
+import com.google.protobuf.ByteString;
+
+import play.Logger;
+import play.Play;
+
 public class RiakMapReduce {
+	
+	public static Map<String, String> function = new HashMap<String, String>();
+	
+	
+	public static void loadQuery(){
+		
+		String rootPath = Play.modules.get("riak").getRealFile().getAbsolutePath() + "/src/play/modules/riak/mapreduce";
+		Logger.debug("Load script in %s", rootPath);
+		//load core directory (play.modules.riak.mapreduce)
+		//TODO: and custom define in riak.mapreduce.input
+		File dir = new File(rootPath);
+		
+		if(!dir.exists()){
+			Logger.info("Dir play.modules.riak.mapreduce not exist" );
+			return;
+		}
+		
+		String[] scriptList = dir.list();
+		
+		for (String file : scriptList) {
+			Logger.debug("Load script: %s", file);
+			String content = "";
+			String cleanFileName = "";
+			
+			if(file.endsWith(".js")){
+				content = getJavascriptfile(rootPath + "/" + file);
+				cleanFileName = file.substring(0, file.length() - ".js".length());
+			}else if(file.endsWith(".coffee")){
+				content = getCoffeeFile(rootPath + "/" + file);
+				cleanFileName = file.substring(0, file.length() - ".coffee".length());
+			}
+			
+			if(!content.isEmpty()){
+				function.put(cleanFileName, content);
+			}
+		}
+	}
+	
+	
+	private static String getJavascriptfile(String filename){
+		File file = new File(filename);
+        String content;
+		try {
+			content = FileUtils.readFileToString(file);
+			return content;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return "";
+		}		
+	}
+	
     private static String getCoffeeFile(String filename) {
         try {
-            File file = new File(filename + ".coffee");
+            //File file = new File(filename + ".coffee");
+        	File file = new File(filename);
             String content = FileUtils.readFileToString(file);
             return new org.jcoffeescript.JCoffeeScriptCompiler().compile(content);
         }
         catch (Exception e) {
+        	e.printStackTrace();
             return "";
         }
     }
 
-	// Contributed By: Francisco Treacy
-	// http://contrib.basho.com/sorting-by-field.html
-	public static String orderByReduceString = getCoffeeFile("orderByReduceString");
-    
-	// see http://siculars.posterous.com/using-riaks-mapreduce-for-sorting
-	public static String orderByCreationDateMapString = 
-		"function(v, keydata, args) {" +
-			"if (v.values) {" +
-				"var ret = [];" +
-				"o = Riak.mapValuesJson(v)[0];" +
-				"o.lastModifiedParsed = Date.parse(v['values'][0]['metadata']['X-Riak-Last-Modified']);" +
-				"o.key = v['key'];ret.push(o);return ret;" +
-			"} else {" +
-				"return [];" +
-			"}" +
-		"}";
-	
-	public static final String orderByCreateDateAscReduceString = 
-		"function ( v , args ) {" +
-			"v.sort ( function(a,b) {" +
-				"return a['lastModifiedParsed'] - b['lastModifiedParsed']" +
-			"} );" +
-			"return v" +
-		"}";
-	
-	public static final String orderByCreateDateDescReduceString = 
-		"function ( v , args ) {" +
-			"v.sort ( function(a,b) {" +
-				"return b['lastModifiedParsed'] - a['lastModifiedParsed'] " +
-			"} );" +
-			"return v" +
-		"}";
-	
-	// add loop in reduce function because java is less flexible than javascript ( TODO: find a better way)
-	public static final String cleanReduce = "function ( v , args ) {" +
-			"for(var i=0;i<v.length;i++)v[i].lastModifiedParsed = null;"+
-			"return v" +
-		"}";	
-	
 	public static long count(Class clazz){
-//		try {
-//			MapReduceResponse r2 = RiakPlugin.riak.mapReduceOverBucket(RiakPlugin.getBucketName(clazz))
-//				.map(JavascriptFunction.anon("function mapCount(){return [1]}"), false)
-//				.reduce(JavascriptFunction.named("Riak.reduceSum"),true).submit();
-//		    if (r2.isSuccess()) {
-//		    	String tmp = r2.getBodyAsString();
-//		    	tmp = tmp.substring(1, tmp.length() -1);
-//		    	int res = Integer.parseInt(tmp);
-//		    	return res;
-//		    }else{
-//		    	Logger.error("Error during count for class %s", clazz.getName());
-//		    }
-//		} catch (JSONException e) {
-//			Logger.error("Error during count for class %s", clazz.getName());
-//			e.printStackTrace();
-//		}		
 		
+		MapReduceBuilder builder = new MapReduceBuilder();
+		builder.setBucket(RiakPlugin.getBucketName(clazz));
+		builder.setRiakClient(RiakPlugin.riak);
+		builder.map(JavascriptFunction.anon(RiakMapReduce.function.get("count")), false);
+		builder.reduce(JavascriptFunction.named("Riak.reduceSum"),true);
+		
+		try {
+			MapReduceResponseSource mrs = builder.submit(new RequestMeta().contentType("application/json"));
+			while(mrs.hasNext()){
+				MapReduceResponse mr = mrs.next();
+				ByteString bs = mr.getContent();
+				if(bs != null && !bs.isEmpty()){
+					String resString = bs.toStringUtf8();
+					resString = resString.substring(1, resString.length() -1);
+					return Long.parseLong(resString);
+				}
+			}			
+		}catch (IOException e) {
+			e.printStackTrace();
+		}		
 		return -1;
 	}
 }

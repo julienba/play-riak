@@ -103,5 +103,8 @@ public class RiakPlugin extends PlayPlugin{
 				}				
 			}
 		}
+		
+		RiakMapReduce.loadQuery();
+		
     }
 }

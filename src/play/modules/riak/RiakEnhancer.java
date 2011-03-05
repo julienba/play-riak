@@ -83,29 +83,37 @@ public class RiakEnhancer extends Enhancer {
 				"return findAll(play.modules.riak.RiakPlugin.getBucketName(clazz));}",ctClass);
 		ctClass.addMethod(findAll2);
 
-		//TODO : depend of map reduce, see later
-//		CtMethod fetch = CtMethod.make("public static java.util.List fetch(Class clazz, java.lang.reflect.Type returnType, int start, int end){"+
-//		"try {"+
-//			"int[] array = new int[2];"+
-//			"if(start != -1 && end != -1){"+
-//				"array[0] = start;"+
-//				"array[1] = end;"+
-//			"}"+
-//			"com.basho.riak.client.response.MapReduceResponse r = play.modules.riak.RiakPlugin.riak.mapReduceOverBucket(RiakPlugin.getBucketName(clazz))"+
-//				".map(com.basho.riak.client.mapreduce.JavascriptFunction.named(\"Riak.mapValuesJson\"), false)"+
-//				".reduce(com.basho.riak.client.mapreduce.JavascriptFunction.named(\"Riak.reduceSlice\"),array,true).submit();"+
-//		    "if (r.isSuccess()) {"+
-//		    	"java.util.List jsonResult = new com.google.gson.Gson().fromJson(r.getBodyAsString(), returnType);"+
-//		    	"return jsonResult;"+
-//		    "}else{"+
-//		    	"System.out.println(\"Error during fetch for class \");"+
-//		    "}"+	
-//		"} catch (org.json.JSONException e) {"+
-//			"e.printStackTrace();"+
-//		"}"+		
-//		"return null;}"		
-//		,ctClass);
-//		ctClass.addMethod(fetch);
+		
+		CtMethod fetch = CtMethod.make("public static java.util.List fetch(Class clazz, java.lang.reflect.Type returnType, int start, int end){"+
+			"int[] array = new int[2];"+
+			"if(start != -1 && end != -1){"+
+				"array[0] = start;"+
+				"array[1] = end;"+
+			"}"+
+			"com.basho.riak.pbc.mapreduce.MapReduceBuilder builder = new com.basho.riak.pbc.mapreduce.MapReduceBuilder();"+
+			"builder.setBucket(play.modules.riak.RiakPlugin.getBucketName(clazz));"+
+			"builder.setRiakClient(play.modules.riak.RiakPlugin.riak);"+
+			"builder.map(com.basho.riak.pbc.mapreduce.JavascriptFunction.named(\"Riak.mapValuesJson\"), false);"+
+			"builder.reduce(com.basho.riak.pbc.mapreduce.JavascriptFunction.named(\"Riak.reduceSlice\"), array, true);"+
+			"try {"+
+				"com.basho.riak.pbc.MapReduceResponseSource mrs = builder.submit(new com.basho.riak.pbc.RequestMeta().contentType(\"application/json\"));"+
+				"while(mrs.hasNext()){"+
+					"com.basho.riak.pbc.mapreduce.MapReduceResponse mr = mrs.next();"+
+					"com.google.protobuf.ByteString bs = mr.getContent();"+
+					"String res = \"\";"+
+					"if(bs != null && !bs.isEmpty())"+
+						"res = bs.toStringUtf8();"+
+				
+					"if(!res.isEmpty()){"+
+						"java.util.List jsonResult = new com.google.gson.Gson().fromJson(res, returnType);"+
+						"return jsonResult;"+
+					"}"+				
+				"}"+			
+			"}catch (java.io.IOException e) {"+
+				"e.printStackTrace();"+
+			"}"+
+			"return null;}",ctClass);
+		ctClass.addMethod(fetch);
 		
 		// Done.
 		applicationClass.enhancedByteCode = ctClass.toBytecode(); 
