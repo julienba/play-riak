@@ -64,8 +64,8 @@ public class RiakPlugin extends PlayPlugin{
 		}		
 		
 		try {
-			Logger.info("Init riak client (url: %s )", RIAK_URL);
-			riak = new RiakClient(RIAK_URL);
+			Logger.info("Init riak client (url: %s port: %s )", RIAK_URL, RIAK_PORT);
+			riak = new RiakClient(RIAK_URL, RIAK_PORT);
 			riak.ping();
 			return true;
 		} catch (IOException e) {
