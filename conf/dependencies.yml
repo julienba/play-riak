@@ -1,0 +1,6 @@
+# not works for the moment
+# self: play -> riak 1.0
+# 
+# require:
+#     - play
+#     - com.basho.riak -> riak-client 0.14.1
