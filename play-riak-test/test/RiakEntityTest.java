@@ -1,5 +1,6 @@
 import java.util.Collection;
 import java.util.List;
+import java.util.Map.Entry;
 
 import models.riak.Album;
 import models.riak.MusicBand;
@@ -14,7 +15,7 @@ import play.modules.riak.RiakPlugin;
 import play.modules.riak.RiakUtil;
 import play.test.UnitTest;
 
-import com.basho.riak.pbc.RiakObject;
+import com.basho.riak.client.IRiakObject;
 
 
 public class RiakEntityTest extends UnitTest{
@@ -23,13 +24,16 @@ public class RiakEntityTest extends UnitTest{
 	public void saveAndFind(){
 		
 		// Delete all
-		Collection<String> keys = MusicBand.findKeys("MusicBand");
+		Iterable<String> keys = MusicBand.findKeys("MusicBand");
 		for(String key : keys){
 			MusicBand.delete("MusicBand", key);
 		}
 		
-		Collection<String> keysAfter = MusicBand.findKeys("MusicBand");
-		assertEquals(0, keysAfter.size());
+		Iterable<String> keysAfter = MusicBand.findKeys("MusicBand");
+		int cpt = 0;
+		for (String string : keysAfter)
+			cpt++;
+		assertEquals(0, cpt);
 		
 		// Save
 		MusicBand mu = new MusicBand("SonicYouth", "Best band ever");
@@ -38,8 +42,11 @@ public class RiakEntityTest extends UnitTest{
 		MusicBand mu2 = new MusicBand("Dillinger_escape", "Insane");
 		assertTrue(mu2.save());
 		
-		Collection<String> keysAfter2 = MusicBand.findKeys("MusicBand");
-		assertEquals(2, keysAfter2.size());		
+		Iterable<String> keysAfter2 = MusicBand.findKeys("MusicBand");
+		for (String string : keysAfter)		
+			cpt++;
+		
+		assertEquals(2, cpt);		
 		
 		// Find
 		MusicBand mu3 = MusicBand.find("MusicBand", "SonicYouth");
@@ -48,7 +55,13 @@ public class RiakEntityTest extends UnitTest{
 		assertEquals("Best band ever", mu3.description);
 
 		assertNotNull(mu3.getUserMeta());
-		assertEquals(0, mu3.getUserMeta().size());
+		Iterable<Entry<String, String>> metas = mu3.getUserMeta();
+		cpt = 0;
+		assertNotNull(metas);
+		for (Entry<String, String> entry : metas) {
+			cpt++;
+		}
+		assertEquals(0, cpt);
 		
 		// Edit
 		mu3.description = "Sonic Youth is an American rock band from New York City, formed in 1981.";
@@ -110,7 +123,7 @@ public class RiakEntityTest extends UnitTest{
 		Album aa = Album.find("AlbumTest", "DaydreamNation");
 		assertNotNull(aa);
 		
-		RiakObject o = aa.getObj();
+		IRiakObject o = aa.getObj();
 		assertNotNull(o);
 		
 		assertEquals(1, o.getLinks().size());
@@ -134,24 +147,36 @@ public class RiakEntityTest extends UnitTest{
 	@Test
 	public void deleteAll(){		
 		RiakUtil.deleteAllDefineBucket();
-		Collection<String> keys = MusicBand.findKeys("Musicband");
-		assertEquals(0, keys.size());
+		Iterable<String> keys = MusicBand.findKeys("Musicband");
 		
-		assertEquals(0, Year.findKeys("Year").size());
-		assertEquals(0, Album.findKeys("AlbumTest").size());
+		int cpt = 0;
+		for (String string : keys) {
+			cpt++;
+		}
+		assertEquals(0, cpt);
+		
+		keys = Year.findKeys("Year");
+		for (String string : keys) {
+			cpt++;
+		}
+		assertEquals(0, cpt);		
+		
+		
+		keys = Year.findKeys("AlbumTest");
+		for (String string : keys) {
+			cpt++;
+		}
+		assertEquals(0, cpt);
 		
 	}
 	
 	@Test
 	public void saveAndfindWithoutBucketName(){
 		// Delete all
-		Collection<String> keys = MusicBand.findKeys(MusicBand.class);
+		Iterable<String> keys = MusicBand.findKeys(MusicBand.class);
 		for(String key : keys){
 			MusicBand.delete(MusicBand.class, key);
 		}
-		
-		Collection<String> keysAfter = MusicBand.findKeys(MusicBand.class);
-		assertEquals(0, keysAfter.size());
 		
 		// Save
 		MusicBand mu = new MusicBand("SonicYouth", "Best band ever");
@@ -160,8 +185,12 @@ public class RiakEntityTest extends UnitTest{
 		MusicBand mu2 = new MusicBand("Dillinger_escape", "Insane");
 		assertTrue(mu2.save());
 		
-		Collection<String> keysAfter2 = MusicBand.findKeys(MusicBand.class);
-		assertEquals(2, keysAfter2.size());		
+		Iterable<String> keysAfter2 = MusicBand.findKeys(MusicBand.class);
+		int cpt = 0;
+		for (String string : keysAfter2) {
+			cpt++;
+		}
+		assertEquals(2, cpt);				
 		
 		// Find
 		MusicBand mu3 = MusicBand.find(MusicBand.class, "SonicYouth");
@@ -169,7 +198,6 @@ public class RiakEntityTest extends UnitTest{
 		assertEquals("SonicYouth", mu3.name);
 		assertEquals("Best band ever", mu3.description);
 		assertNotNull(mu3.getUserMeta());
-		assertEquals(0, mu3.getUserMeta().size());
 		
 		// Edit
 		mu3.description = "Sonic Youth is an American rock band from New York City, formed in 1981.";
