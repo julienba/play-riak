@@ -19,7 +19,7 @@ import com.basho.riak.client.IRiakClient;
 import com.basho.riak.client.IRiakObject;
 import com.basho.riak.client.RiakException;
 import com.basho.riak.client.RiakLink;
-import com.basho.riak.client.builders.RiakObjectBuilder;
+import com.basho.riak.client.bucket.Bucket;
 import com.basho.riak.client.query.MapReduce;
 import com.basho.riak.client.query.MapReduceResult;
 import com.basho.riak.client.query.functions.JSSourceFunction;
@@ -57,10 +57,10 @@ public class RiakModel {
         // Hack to prevent serialisation of obj
         if(this.obj != null){
             o = this.obj;
+            this.obj = null;
         }
         
         String jsonValue = new Gson().toJson(this);
-        
         this.obj = o;
         return jsonValue;
     }
@@ -68,43 +68,26 @@ public class RiakModel {
     public boolean save() {
         Logger.debug("RiakModel save %s", this.toString());
 
-        IRiakObject o = null;
-        // Hack to prevent serialisation of obj
-        if(this.obj != null){
-            o = this.obj;
-        }
-        
-        this.obj = null;
-        
-        String jsonValue = new Gson().toJson(this);
+        String jsonValue = toJSON();
         RiakPath path = this.getPath();
         
         if(path != null){
             Logger.debug("Create new object %s, %s", path.getBucket(), path.getValue());
-            
-            RiakObjectBuilder builder = this.obj != null
-                ? RiakObjectBuilder.from(this.obj)
-                : RiakObjectBuilder.newBuilder(path.getBucket(), path.getKey());
-                
-            builder = builder.withValue(jsonValue);
-                //.withContentType("application/json");
-
-            if(o != null && o.getLinks() != null)
-                builder.withLinks(o.getLinks());
-            
-            this.obj = builder.build();
-            
             try {
-                this.obj = riak.fetchBucket(path.getBucket())
-                    .execute()
-                    .store(this.obj)
-                    .execute();
-                ;
-                return true;
+            	Bucket bucket = RiakPlugin.riak.createBucket(path.getBucket()).execute();
+            	IRiakObject riakObject = bucket.store(path.getValue(), jsonValue).returnBody(true).execute();
+//            	if(this.obj != null && this.obj.getLinks() != null){
+//            		for (RiakLink riakLink : this.obj.getLinks()) {
+//						riakObject.addLink(riakLink);
+//					}
+//            	}
+            	
+            	this.setObj(riakObject);
+            	
+            	return true;
             } catch (RiakException e) {
-                Logger.error("Error during save of %s: %s", path.getKey(), jsonValue);
-                e.printStackTrace();
-                return false;
+            	e.printStackTrace();
+            	return false;
             }
         }else{
             return false;
@@ -316,7 +299,12 @@ public class RiakModel {
         this.addLink(RiakPlugin.getBucketName(clazz), key, tag);
     }   
     public void addLink(String bucket, String key, String tag){
-        obj.addLink(new RiakLink(tag, bucket, key));
+
+    	if(obj == null){
+    		Logger.error("RiakObject [%s,%s] is null, save Entity and add link after", bucket, key);
+    	}else{
+    		obj.addLink(new RiakLink(tag, bucket, key));
+    	}
     }
     
     public static <T extends RiakModel> List<T> jsonToList(String json, Type listType){

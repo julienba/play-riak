@@ -7,13 +7,6 @@ import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 
-import com.basho.riak.pbc.MapReduceResponseSource;
-import com.basho.riak.pbc.RequestMeta;
-import com.basho.riak.pbc.mapreduce.JavascriptFunction;
-import com.basho.riak.pbc.mapreduce.MapReduceBuilder;
-import com.basho.riak.pbc.mapreduce.MapReduceResponse;
-import com.google.protobuf.ByteString;
-
 import play.Logger;
 import play.Play;
 

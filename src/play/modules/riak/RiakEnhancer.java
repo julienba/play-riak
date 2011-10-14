@@ -67,7 +67,7 @@ public class RiakEnhancer extends Enhancer {
 		ctClass.addMethod(find2);
 		
 		CtMethod findAll = CtMethod.make("public static java.util.List findAll(String bucket){" +
-				"java.util.Collection keys = " + entityName + ".findKeys(bucket);" +
+				"java.lang.Iterable keys = " + entityName + ".findKeys(bucket);" +
 				"java.util.List result = new java.util.ArrayList();"+
 				"for (java.util.Iterator iterator = keys.iterator(); iterator.hasNext();) {"+
 					"String key = (String) iterator.next();"+
